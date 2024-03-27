@@ -23,11 +23,14 @@ from ._vv import VVHgvsVariantCoordinateFinder
 VALIDATION_POLICIES = {'none', 'lenient', 'strict'}
 
 
-def configure_caching_cohort_creator(hpo: hpotk.MinimalOntology,
-                                     genome_build: str = 'GRCh38.p13',
-                                     validation_runner: typing.Optional[hpotk.validate.ValidationRunner] = None,
-                                     cache_dir: typing.Optional[str] = None,
-                                     variant_fallback: str = 'VEP') -> CohortCreator[Phenopacket]:
+def configure_caching_cohort_creator(
+        hpo: hpotk.MinimalOntology,
+        genome_build: str = 'GRCh38.p13',
+        validation_runner: typing.Optional[hpotk.validate.ValidationRunner] = None,
+        cache_dir: typing.Optional[str] = None,
+        variant_fallback: str = 'VEP',
+        timeout: int = 10,
+        ) -> CohortCreator[Phenopacket]:
     """
     A convenience function for configuring a caching :class:`genophenocorr.preprocessing.PhenopacketPatientCreator`.
 
@@ -41,8 +44,7 @@ def configure_caching_cohort_creator(hpo: hpotk.MinimalOntology,
      In any case, the directory will be created if it does not exist (including non-existing parents).
     :param variant_fallback: the fallback variant annotator to use if we cannot find the annotation locally.
      Choose from ``{'VEP'}`` (just one fallback implementation is available at the moment).
-    :param protein_fallback: the fallback protein metadata annotator to use if we cannot find the annotation locally.
-     Choose from ``{'UNIPROT'}`` (just one fallback implementation is available at the moment).
+    :param timeout: timeout in seconds for the VEP API
     """
     if cache_dir is None:
         cache_dir = os.path.join(os.getcwd(), '.genophenocorr_cache')
@@ -50,18 +52,21 @@ def configure_caching_cohort_creator(hpo: hpotk.MinimalOntology,
 
     build = _configure_build(genome_build)
     phenotype_creator = _setup_phenotype_creator(hpo, validation_runner)
-    functional_annotator = _configure_functional_annotator(cache_dir, variant_fallback)
+    functional_annotator = _configure_functional_annotator(cache_dir, variant_fallback, timeout)
     hgvs_annotator = VVHgvsVariantCoordinateFinder(build)
     pc = PhenopacketPatientCreator(build, phenotype_creator, functional_annotator, hgvs_annotator)
 
     return CohortCreator(pc)
 
 
-def configure_caching_patient_creator(hpo: hpotk.MinimalOntology,
-                                      genome_build: str = 'GRCh38.p13',
-                                      validation_runner: typing.Optional[hpotk.validate.ValidationRunner] = None,
-                                      cache_dir: typing.Optional[str] = None,
-                                      variant_fallback: str = 'VEP') -> PhenopacketPatientCreator:
+def configure_caching_patient_creator(
+        hpo: hpotk.MinimalOntology,
+        genome_build: str = 'GRCh38.p13',
+        validation_runner: typing.Optional[hpotk.validate.ValidationRunner] = None,
+        cache_dir: typing.Optional[str] = None,
+        variant_fallback: str = 'VEP',
+        timeout: int = 10,
+    ) -> PhenopacketPatientCreator:
     """
     A convenience function for configuring a caching :class:`genophenocorr.preprocessing.PhenopacketPatientCreator`.
 
@@ -75,8 +80,7 @@ def configure_caching_patient_creator(hpo: hpotk.MinimalOntology,
      In any case, the directory will be created if it does not exist (including non-existing parents).
     :param variant_fallback: the fallback variant annotator to use if we cannot find the annotation locally.
      Choose from ``{'VEP'}`` (just one fallback implementation is available at the moment).
-    :param protein_fallback: the fallback protein metadata annotator to use if we cannot find the annotation locally.
-     Choose from ``{'UNIPROT'}`` (just one fallback implementation is available at the moment).
+    :param timeout: timeout in seconds for the VEP API
     """
     warnings.warn('`configure_caching_patient_creator` was deprecated. '
                   'Use `configure_caching_cohort_creator` instead', DeprecationWarning, stacklevel=2)
@@ -85,15 +89,18 @@ def configure_caching_patient_creator(hpo: hpotk.MinimalOntology,
 
     build = _configure_build(genome_build)
     phenotype_creator = _setup_phenotype_creator(hpo, validation_runner)
-    functional_annotator = _configure_functional_annotator(cache_dir, variant_fallback)
+    functional_annotator = _configure_functional_annotator(cache_dir, variant_fallback, timeout)
     hgvs_annotator = VVHgvsVariantCoordinateFinder(build)
     return PhenopacketPatientCreator(build, phenotype_creator, functional_annotator, hgvs_annotator)
 
 
-def configure_cohort_creator(hpo: hpotk.MinimalOntology,
-                             genome_build: str = 'GRCh38.p13',
-                             validation_runner: typing.Optional[hpotk.validate.ValidationRunner] = None,
-                             variant_fallback: str = 'VEP') -> CohortCreator[Phenopacket]:
+def configure_cohort_creator(
+        hpo: hpotk.MinimalOntology,
+        genome_build: str = 'GRCh38.p13',
+        validation_runner: typing.Optional[hpotk.validate.ValidationRunner] = None,
+        variant_fallback: str = 'VEP',
+        timeout: int = 10,
+        ) -> CohortCreator[Phenopacket]:
     """
     A convenience function for configuring a non-caching :class:`genophenocorr.preprocessing.PhenopacketPatientCreator`.
 
@@ -106,11 +113,12 @@ def configure_cohort_creator(hpo: hpotk.MinimalOntology,
      In any case, the directory will be created if it does not exist (including non-existing parents).
     :param variant_fallback: the fallback variant annotator to use if we cannot find the annotation locally.
      Choose from ``{'VEP'}`` (just one fallback implementation is available at the moment).
+    :param timeout: timeout in seconds for the VEP API
     """
     build = _configure_build(genome_build)
 
     phenotype_creator = _setup_phenotype_creator(hpo, validation_runner)
-    functional_annotator = _configure_fallback_functional(variant_fallback)
+    functional_annotator = _configure_fallback_functional(variant_fallback, timeout)
     hgvs_annotator = VVHgvsVariantCoordinateFinder(build)
     pc = PhenopacketPatientCreator(build, phenotype_creator, functional_annotator, hgvs_annotator)
 
@@ -138,8 +146,6 @@ def configure_patient_creator(hpo: hpotk.MinimalOntology,
      In any case, the directory will be created if it does not exist (including non-existing parents).
     :param variant_fallback: the fallback variant annotator to use if we cannot find the annotation locally.
      Choose from ``{'VEP'}`` (just one fallback implementation is available at the moment).
-    :param protein_fallback: the fallback protein metadata annotator to use if we cannot find the annotation locally.
-     Choose from ``{'UNIPROT'}`` (just one fallback implementation is available at the moment).
     """
     warnings.warn('`configure_patient_creator` was deprecated. '
                   'Use `configure_cohort_creator` instead', DeprecationWarning, stacklevel=2)
@@ -175,12 +181,15 @@ def _setup_phenotype_creator(hpo: hpotk.MinimalOntology,
     return PhenotypeCreator(hpo, validator)
 
 
-def _configure_functional_annotator(cache_dir: str,
-                                    variant_fallback: str) -> FunctionalAnnotator:
+def _configure_functional_annotator(
+        cache_dir: str,
+        variant_fallback: str,
+        timeout: int,
+        ) -> FunctionalAnnotator:
 
     # (2) FunctionalAnnotator
     # Setup fallback
-    fallback = _configure_fallback_functional(variant_fallback)
+    fallback = _configure_fallback_functional(variant_fallback, timeout)
 
     # Setup variant cache
     var_cache_dir = os.path.join(cache_dir, 'variant_cache')
@@ -191,9 +200,12 @@ def _configure_functional_annotator(cache_dir: str,
     return VarCachingFunctionalAnnotator(var_cache, fallback)
 
 
-def _configure_fallback_functional(variant_fallback: str) -> FunctionalAnnotator:
+def _configure_fallback_functional(
+        variant_fallback: str,
+        timeout: int,
+        ) -> FunctionalAnnotator:
     if variant_fallback == 'VEP':
-        fallback = VepFunctionalAnnotator()
+        fallback = VepFunctionalAnnotator(timeout=timeout)
     else:
         raise ValueError(f'Unknown variant fallback annotator type {variant_fallback}')
     return fallback

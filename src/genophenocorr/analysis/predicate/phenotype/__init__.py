@@ -1,7 +1,9 @@
-from ._pheno import PhenotypePredicateFactory, PropagatingPhenotypePredicate, PropagatingPhenotypeBooleanPredicate
-from ._pheno import PropagatingPhenotypeBooleanPredicateFactory
+from ._pheno import PhenotypePolyPredicate, PropagatingPhenotypePredicate
+from ._pheno import DiseasePresencePredicate
+from ._pheno import PhenotypeCategorization, Comparable, P
 
 __all__ = [
-    'PropagatingPhenotypePredicate', 'PropagatingPhenotypeBooleanPredicate',
-    'PhenotypePredicateFactory', 'PropagatingPhenotypeBooleanPredicateFactory'
+    'PhenotypePolyPredicate', 'PropagatingPhenotypePredicate',
+    'DiseasePresencePredicate',
+    'PhenotypeCategorization', 'Comparable', 'P',
 ]

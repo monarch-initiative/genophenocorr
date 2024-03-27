@@ -5,162 +5,156 @@ import hpotk
 
 from genophenocorr.model import Patient
 
-from .._api import PolyPredicate, BooleanPredicate, PatientCategory
+from .._api import PolyPredicate, PatientCategory, PatientCategories, C, Categorization
 
 
-class PhenotypePolyPredicate(PolyPredicate, metaclass=abc.ABCMeta):
-    pass
+class Comparable(metaclass=abc.ABCMeta):
+    """
+    A protocol for annotating comparable types.
+    """
+
+    @abc.abstractmethod
+    def __eq__(self, other: typing.Any) -> bool:
+        pass
+
+    @abc.abstractmethod
+    def __lt__(self, other: typing.Any) -> bool:
+        pass
 
 
-class BasePhenotypeBooleanPredicate(PhenotypePolyPredicate, BooleanPredicate, metaclass=abc.ABCMeta):
-    pass
+P = typing.TypeVar('P', typing.Hashable, Comparable)
+"""
+Phenotype entity of interest, such as :class:`hpotk.model.TermId`, representing an HPO term or an OMIM/MONDO term.
+
+However, phenotype entity can be anything as long as it is hashable and comparable.
+"""
 
 
-class PropagatingPhenotypeBooleanPredicate(BasePhenotypeBooleanPredicate):
+class PhenotypeCategorization(typing.Generic[P], Categorization):
+    """"
+    On top of the attributes of the `Categorization`, `PhenotypeCategorization` keeps track of the target phenotype `P`.
+    """
+
+    def __init__(
+            self,
+            category: PatientCategory,
+            phenotype: P,
+    ):
+        super().__init__(category)
+        self._phenotype = phenotype
+
+    @property
+    def phenotype(self) -> P:
+        return self._phenotype
+
+    def __repr__(self) -> str:
+        return f"PhenotypeCategorization(" \
+               f"category={self._category}, " \
+               f"phenotype={self._phenotype})"
+
+    def __str__(self) -> str:
+        return repr(self)
+
+    def __eq__(self, other) -> bool:
+        return isinstance(other, PhenotypeCategorization) \
+            and self._category == other._category \
+            and self._phenotype == other._phenotype
+
+    def __hash__(self) -> int:
+        return hash((self._category, self._phenotype))
+
+
+class PhenotypePolyPredicate(typing.Generic[P], PolyPredicate[PhenotypeCategorization[P]], metaclass=abc.ABCMeta):
+    """
+    `PhenotypePolyPredicate` investigates a patient in context of one or more phenotype categories `P`.
+
+    Each phenotype category `P` can be a :class:`hpotk.model.TermId` representing an HPO term or an OMIM/MONDO term.
+
+    Most of the time, only one category is investigated, and :attr:`phenotype` will return a sequence with
+    one element only (e.g. *Arachnodactyly* `HP:0001166`). However, multiple categories can be sought as well,
+    such as when the predicate bins the patient into one of discrete diseases
+    (e.g. Geleophysic dysplasia, Marfan syndrome, ...). Then the predicate should return a sequence of disease
+    identifiers.
+    """
+
+    @property
+    @abc.abstractmethod
+    def phenotypes(self) -> typing.Sequence[P]:
+        """
+        Get the phenotype entities of interest.
+        """
+        pass
+
+
+class PropagatingPhenotypePredicate(PhenotypePolyPredicate[PhenotypeCategorization[hpotk.TermId]]):
+    """
+    `PropagatingPhenotypePredicate` tests if a patient is annotated with an HPO term.
+
+    Note, `query` must be a term of the provided `hpo`!
+
+    :param hpo: HPO object
+    :param query: the HPO term to test
+    :param missing_implies_excluded: `True` if lack of an explicit annotation implies term's absence`.
+    """
 
     def __init__(self, hpo: hpotk.MinimalOntology,
-                 phenotypic_feature: hpotk.TermId,
-                 missing_implies_excluded: bool = False) -> None:
+                 query: hpotk.TermId,
+                 missing_implies_excluded: bool = False):
         self._hpo = hpotk.util.validate_instance(hpo, hpotk.MinimalOntology, 'hpo')
-        self._query = hpotk.util.validate_instance(phenotypic_feature, hpotk.TermId, 'phenotypic_feature')
+        self._query = hpotk.util.validate_instance(query, hpotk.TermId, 'phenotypic_feature')
+        self._query_label = self._hpo.get_term_name(query)
+        assert self._query_label is not None, f'Query {query} is in HPO'
         self._missing_implies_excluded = hpotk.util.validate_instance(missing_implies_excluded, bool,
                                                                       'missing_implies_excluded')
+        self._present = PhenotypeCategorization(
+            category=PatientCategories.YES,
+            phenotype=query,
+        )
+        self._excluded = PhenotypeCategorization(
+            category=PatientCategories.NO,
+            phenotype=query,
+        )
 
     def get_question(self) -> str:
-        query_label = self._hpo.get_term(self._query).name
-        return f'Is \'{query_label}\' present in the patient?'
+        return f'Is {self._query_label} present in the patient?'
 
-    def test(self, patient: Patient) -> typing.Optional[PatientCategory]:
+    @property
+    def phenotypes(self) -> typing.Sequence[hpotk.TermId]:
+        # We usually test just a single HPO term, so we return a tuple with a single member.
+        return self._query,
+
+    def get_categorizations(self) -> typing.Sequence[C]:
+        return self._present, self._excluded
+
+    def test(self, patient: Patient) -> typing.Optional[PhenotypeCategorization[P]]:
         self._check_patient(patient)
 
         if len(patient.phenotypes) == 0:
             return None
 
         for phenotype in patient.phenotypes:
-            if phenotype.is_observed:
+            if phenotype.is_present:
                 if any(self._query == anc for anc in self._hpo.graph.get_ancestors(phenotype, include_source=True)):
-                    return BooleanPredicate.YES
+                    return self._present
             else:
                 if self._missing_implies_excluded:
-                    return BooleanPredicate.NO
+                    return self._excluded
                 else:
                     if any(self._query == desc for desc in
                            self._hpo.graph.get_descendants(phenotype, include_source=True)):
-                        return BooleanPredicate.NO
+                        return self._excluded
 
         return None
 
-
-class PropagatingPhenotypePredicate(PhenotypePolyPredicate):
-    """
-    `PropagatingPhenotypePredicate` tests if the `patient` is annotated with a `query` HPO term.
-
-    The predicate returns the following results:
-
-    * :attr:`PropagatingPhenotypePredicate.PRESENT` if the patient is annotated with the `query` term or its descendant
-    * :attr:`PropagatingPhenotypePredicate.EXCLUDED` presence of the `query` term or its ancestor was specifically
-      excluded in the patient
-    * :attr:`PropagatingPhenotypePredicate.NOT_MEASURED` if the patient is not annotated with the `query` and presence of `query`
-      was *not* excluded
-    """
-
-    PRESENT = PatientCategory(cat_id=0,
-                              name='Present',
-                              description="""
-                              The sample *is* annotated with the tested phenotype feature `q`.
-
-                              This is either because the sample is annotated with `q` (exact match),
-                              or because one of sample's annotations is a descendant `q` (annotation propagation).
-                              For instance, we tested for a Seizure and the sample *had* a Clonic seizure 
-                              (a descendant of Seizure).
-                              """)  #: :meta hide-value:
-
-    EXCLUDED = PatientCategory(cat_id=1,
-                               name='Excluded',
-                               description="""
-                               We are particular about the sample *not* having the tested feature `q`.
-
-                               In other words, `q` was *excluded* in the sample or the sample is annotated with an excluded ancestor of `q`.
-
-                               For instance, we tested for a Clonic seizure and the sample did *not* have any Seizure, which implies 
-                               *not* Clonic seizure.  
-                               """)  #: :meta hide-value:
-
-    NOT_MEASURED = PatientCategory(cat_id=2,
-                                   name='Not measured',
-                                   description="""
-                                   We do not know if the sample has or has not the tested feature.
-                                   """)  #: :meta hide-value:
-
-    def __init__(self, hpo: hpotk.MinimalOntology,
-                 phenotypic_feature: hpotk.TermId) -> None:
-        self._hpo = hpotk.util.validate_instance(hpo, hpotk.MinimalOntology, 'hpo')
-        self._query = hpotk.util.validate_instance(phenotypic_feature, hpotk.TermId, 'phenotypic_feature')
-
-    @staticmethod
-    def get_categories() -> typing.Sequence[PatientCategory]:
-        return PropagatingPhenotypePredicate.PRESENT, PropagatingPhenotypePredicate.EXCLUDED, PropagatingPhenotypePredicate.NOT_MEASURED
-
-    def get_question(self) -> str:
-        query_label = self._hpo.get_term(self._query).name
-        return f'Is \'{query_label}\' present in the patient?'
-
-    def test(self, patient: Patient) -> typing.Optional[PatientCategory]:
-        self._check_patient(patient)
-
-        if len(patient.phenotypes) == 0:
-            return None
-
-        for phenotype in patient.phenotypes:
-            if phenotype.is_observed:
-                if any(self._query == anc for anc in self._hpo.graph.get_ancestors(phenotype, include_source=True)):
-                    return PropagatingPhenotypePredicate.PRESENT
-            else:
-                if any(self._query == desc for desc in self._hpo.graph.get_descendants(phenotype, include_source=True)):
-                    return self.EXCLUDED
-
-        return self.NOT_MEASURED
-
-    def __str__(self):
-        return repr(self)
-
     def __repr__(self):
-        return f'PropagatingPhenotypePredicate(query={self._query})'
+        return f'PropagatingPhenotypeBooleanPredicate(query={self._query})'
 
 
-class PhenotypePredicateFactory(metaclass=abc.ABCMeta):
+class DiseasePresencePredicate(PhenotypePolyPredicate[PhenotypeCategorization[hpotk.TermId]]):
     """
-    `PhenotypePredicateFactory` creates a :class:`PhenotypePolyPredicate` to assess a phenotype query.
+    `DiseasePresencePredicate` tests if the patient was diagnosed with a disease.
+
+    The predicate tests if the patient's diseases include a disease ID formatted as a :class:`hpotk.model.TermId`.
     """
-
-    @staticmethod
-    @abc.abstractmethod
-    def get_categories() -> typing.Sequence[PatientCategory]:
-        """
-        Get a sequence of all categories which the `PhenotypePolyPredicate` provided by this factory can produce.
-        """
-        pass
-
-    @abc.abstractmethod
-    def get_predicate(self, query: hpotk.TermId) -> PhenotypePolyPredicate:
-        """
-        Get an instance of `PhenotypePolyPredicate` for the phenotype `query`.
-
-        :param query: a term ID of the query phenotype.
-        """
-        pass
-
-
-class PropagatingPhenotypeBooleanPredicateFactory(PhenotypePredicateFactory):
-
-    def __init__(self, hpo: hpotk.MinimalOntology,
-                 missing_implies_excluded: bool = False):
-        self._hpo = hpotk.util.validate_instance(hpo, hpotk.MinimalOntology, 'hpo')
-        self._missing_implies_excluded = missing_implies_excluded
-
-    @staticmethod
-    def get_categories() -> typing.Sequence[PatientCategory]:
-        return PropagatingPhenotypeBooleanPredicate.get_categories()
-
-    def get_predicate(self, query: hpotk.TermId) -> PhenotypePolyPredicate:
-        return PropagatingPhenotypeBooleanPredicate(self._hpo, query, self._missing_implies_excluded)
+    # TODO: Lauren please implement and test.
+    pass

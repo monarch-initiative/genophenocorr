@@ -35,12 +35,16 @@ class Genotypes(typing.Sized, typing.Iterable):
     """
     `Genotypes` is a container for mapping between sample ID and its genotype.
 
-    Use one of the static methods to create an instance:
+    Let's consider a pair of samples:
 
     >>> a = SampleLabels('A')
     >>> b = SampleLabels('B')
-    >>> gts = Genotypes.single(a, Genotype.HETEROZYGOUS)
-    >>> _ = Genotypes.from_mapping({a: Genotype.HETEROZYGOUS, b: Genotype.HOMOZYGOUS_ALTERNATE})
+
+    We can use one of the static methods to create an instance. Either a single genotype:
+    >>> gt = Genotypes.single(a, Genotype.HETEROZYGOUS)
+
+    Or genotypes of several samples:
+    >>> gts = Genotypes.from_mapping({a: Genotype.HETEROZYGOUS, b: Genotype.HOMOZYGOUS_ALTERNATE})
 
     There are 2 genotypes in the container:
 
@@ -49,18 +53,18 @@ class Genotypes(typing.Sized, typing.Iterable):
 
     You can get a genotype for a sample ID:
 
-    >>> gts.for_sample(a)
-    Genotype.HETEROZYGOUS
+    >>> g = gts.for_sample(a)
+    >>> g.code
+    '0/1'
 
     You will get `None` if the sample is not present:
 
     >>> gts.for_sample(SampleLabels('UNKNOWN'))
-    None
 
     You can iterate over sample-genotype pairs:
 
-    >>> for sample_id, gt in gts:
-    ...   print(sample_id, gt)
+    >>> for sample_id, genotype in gts:
+    ...   print(sample_id, genotype)
     A 0/1
     B 1/1
     """

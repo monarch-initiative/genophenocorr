@@ -11,7 +11,6 @@ from ._api import CohortAnalysis
 from ._filter import SimplePhenotypeFilter
 from ._gp_analysis import FisherExactAnalyzer
 from ._gp_impl import GpCohortAnalysis
-from .predicate.phenotype import PropagatingPhenotypeBooleanPredicateFactory
 
 P_VAL_OPTIONS = (
     'bonferroni', 'b',
@@ -196,14 +195,8 @@ def configure_cohort_analysis(cohort: Cohort,
         config.min_perc_patients_w_hpo,
     )
 
-    # Configure the nuts and bolts of the G/P analysis.
-    phenotype_predicate_factory = PropagatingPhenotypeBooleanPredicateFactory(
-        hpo=hpo,
-        missing_implies_excluded=config.missing_implies_excluded,
-    )
     # Choosing a simple Fisher's exact test for now.
     gp_analyzer = FisherExactAnalyzer(
-        pheno_predicate_factory=phenotype_predicate_factory,
         p_val_correction=config.pval_correction,
         mtc_alpha=config.mtc_alpha,
     )
@@ -214,6 +207,7 @@ def configure_cohort_analysis(cohort: Cohort,
         protein_service=protein_metadata_service,
         phenotype_filter=phenotype_filter,
         gp_analyzer=gp_analyzer,
+        missing_implies_excluded=config.missing_implies_excluded,
         include_sv=config.include_sv,
     )
 

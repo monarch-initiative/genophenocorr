@@ -11,7 +11,8 @@ An example of simple genotype-phenotype association analysis
 # Load HPO
 import hpotk
 
-hpo = hpotk.load_minimal_ontology('http://purl.obolibrary.org/obo/hp.json')
+store = hpotk.configure_ontology_store()
+hpo = store.load_minimal_hpo()
 
 # Load a cohort of phenopackets
 from genophenocorr.data import get_toy_cohort
@@ -20,24 +21,25 @@ cohort = get_toy_cohort()
 
 # Analyze genotype-phenotype associations
 from genophenocorr.analysis import configure_cohort_analysis
-from genophenocorr.analysis.predicate import BooleanPredicate
+from genophenocorr.analysis.predicate import PatientCategories
+
 from genophenocorr.model import VariantEffect
 
 cohort_analysis = configure_cohort_analysis(cohort, hpo)
 frameshift = cohort_analysis.compare_by_variant_effect(VariantEffect.FRAMESHIFT_VARIANT, tx_id='NM_1234.5')
 
-frameshift.summarize(hpo, phenotype_category=BooleanPredicate.YES)
+frameshift.summarize(hpo, category=PatientCategories.YES)
 ```
 
 provides a pandas data frame with genotype-phenotype correlations:
 
 ```text
-FRAMESHIFT_VARIANT on NM_1234.5        No             Yes
-                                    Count   Percent Count Percent   p value Corrected p value
-    Arachnodactyly [HP:0001166]      1/26      3.84 13/26    50.0   0.00078          0.020299
-    Spasticity [HP:0001257]          6/26     23.08 11/26    42.3   0.69245          1.000000
-    Hypertonia [HP:0001276]          6/17     35.29 11/17    64.7   1.00000          1.000000
-    ...                               ...       ...    ...    ...       ...               ...
+FRAMESHIFT_VARIANT on NM_1234.5                                    No                Yes
+                                                                Count   Percent    Count   Percent    p value    Corrected p value
+    Arachnodactyly [HP:0001166]                                  1/10       10%    13/16       81%   0.000781             0.020299
+    Abnormality of the musculature [HP:0003011]                   6/6      100%    11/11      100%   1.000000             1.000000
+    Abnormal nervous system physiology [HP:0012638]               9/9      100%    15/15      100%   1.000000             1.000000
+    ...                                                           ...       ...      ...       ...        ...                  ...
 ```
 
 ## Documentation

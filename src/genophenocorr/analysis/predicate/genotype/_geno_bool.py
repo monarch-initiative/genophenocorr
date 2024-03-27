@@ -5,31 +5,10 @@ import hpotk
 from genophenocorr.model import Patient, FeatureType, VariantEffect
 from genophenocorr.preprocessing import ProteinMetadataService
 
-from .._api import PatientCategory, BooleanPredicate
+from .._api import Categorization, GenotypeBooleanPredicate
 
 
-# TODO - should we remove these three?
-HETEROZYGOUS = PatientCategory(cat_id=0,
-                               name='Heterozygous',
-                               description="""
-                               This sample has the tested attribute on one allele.
-                               """)  #: :meta hide-value:
-
-HOMOZYGOUS = PatientCategory(cat_id=1,
-                             name='Homozygous',
-                             description="""
-                             This sample has the tested attribute on both alleles.
-                             """)  #: :meta hide-value:
-
-NO_VARIANT = PatientCategory(cat_id=2,
-                             name='No Variant',
-                             description="""
-                             The sample does not have the tested attribute.
-                             """)  #: :meta hide-value:
-
-
-
-class VariantEffectPredicate(BooleanPredicate):
+class VariantEffectPredicate(GenotypeBooleanPredicate):
     """
     `VariantEffectPredicate` tests if the `patient` has at least one variant that is predicted to have
     the functional `effect` on the transcript of interest.
@@ -46,7 +25,7 @@ class VariantEffectPredicate(BooleanPredicate):
     def get_question(self) -> str:
         return f'{self._effect.name} on {self._tx_id}'
 
-    def test(self, patient: Patient) -> typing.Optional[PatientCategory]:
+    def test(self, patient: Patient) -> typing.Optional[Categorization]:
         self._check_patient(patient)
 
         if len(patient.variants) == 0:
@@ -57,9 +36,9 @@ class VariantEffectPredicate(BooleanPredicate):
                 if ann.transcript_id == self._tx_id:
                     for var_eff in ann.variant_effects:
                         if var_eff == self._effect:
-                            return BooleanPredicate.YES
+                            return GenotypeBooleanPredicate.YES
 
-        return BooleanPredicate.NO
+        return GenotypeBooleanPredicate.NO
 
     def __str__(self):
         return repr(self)
@@ -68,7 +47,7 @@ class VariantEffectPredicate(BooleanPredicate):
         return f'VariantEffectPredicate(transcript_id={self._tx_id}, effect={self._effect})'
 
 
-class VariantPredicate(BooleanPredicate):
+class VariantPredicate(GenotypeBooleanPredicate):
     """
     `VariantPredicate` tests if the `patient` has ar least one allele of the variant described by the `variant_key`.
 
@@ -85,7 +64,7 @@ class VariantPredicate(BooleanPredicate):
     def get_question(self) -> str:
         return f'>=1 allele of the variant {self._variant_key}'
 
-    def test(self, patient: Patient) -> typing.Optional[PatientCategory]:
+    def test(self, patient: Patient) -> typing.Optional[Categorization]:
         self._check_patient(patient)
 
         if len(patient.variants) == 0:
@@ -93,9 +72,9 @@ class VariantPredicate(BooleanPredicate):
 
         for variant in patient.variants:
             if variant.variant_coordinates.variant_key == self._variant_key:
-                return BooleanPredicate.YES
+                return GenotypeBooleanPredicate.YES
 
-        return BooleanPredicate.NO
+        return GenotypeBooleanPredicate.NO
 
     def __str__(self):
         return repr(self)
@@ -104,7 +83,7 @@ class VariantPredicate(BooleanPredicate):
         return f'VariantPredicate(variant_key={self._variant_key})'
 
 
-class ExonPredicate(BooleanPredicate):
+class ExonPredicate(GenotypeBooleanPredicate):
     """
     `ExonPredicate` tests if the `patient` has a variant that affects *n*-th exon of the transcript of interest.
 
@@ -116,7 +95,8 @@ class ExonPredicate(BooleanPredicate):
     .. warning::
 
       We do not check if the `exon_number` spans beyond the number of exons of the given `transcript_id`!
-      Therefore, ``exon_number==10,000`` will effectively return :attr:`BooleanPredicate.FALSE` for *all* patients!!! 😱
+      Therefore, ``exon_number==10,000`` will effectively return :attr:`GenotypeBooleanPredicate.FALSE`
+      for *all* patients!!! 😱
       Well, at least the patients of the *Homo sapiens sapiens* taxon...
 
     :param transcript_id: the accession of the transcript of interest.
@@ -133,7 +113,7 @@ class ExonPredicate(BooleanPredicate):
     def get_question(self) -> str:
         return f'Variant in exon {self._exon_number} on {self._tx_id}'
 
-    def test(self, patient: Patient) -> typing.Optional[PatientCategory]:
+    def test(self, patient: Patient) -> typing.Optional[Categorization]:
         self._check_patient(patient)
 
         if len(patient.variants) == 0:
@@ -144,9 +124,9 @@ class ExonPredicate(BooleanPredicate):
                 if ann.transcript_id == self._tx_id:
                     if ann.overlapping_exons is not None:
                         if self._exon_number in ann.overlapping_exons:
-                            return BooleanPredicate.YES
+                            return GenotypeBooleanPredicate.YES
 
-        return BooleanPredicate.NO
+        return GenotypeBooleanPredicate.NO
 
     def __str__(self):
         return repr(self)
@@ -155,7 +135,7 @@ class ExonPredicate(BooleanPredicate):
         return f'ExonPredicate(tx_id={self._tx_id}, exon_number={self._exon_number})'
 
 
-class ProtFeatureTypePredicate(BooleanPredicate):
+class ProtFeatureTypePredicate(GenotypeBooleanPredicate):
     """
     `ProtFeatureTypePredicate` tests if the `patient` has a variant that affects a :class:`FeatureType`
     in the protein encoded by the transcript of interest.
@@ -173,7 +153,7 @@ class ProtFeatureTypePredicate(BooleanPredicate):
     def get_question(self) -> str:
         return f'Variant that affects {self._feature_type.name} feature type on protein encoded by transcript {self._tx_id}'
 
-    def test(self, patient: Patient) -> typing.Optional[PatientCategory]:
+    def test(self, patient: Patient) -> typing.Optional[Categorization]:
         self._check_patient(patient)
 
         if len(patient.variants) == 0:
@@ -191,11 +171,11 @@ class ProtFeatureTypePredicate(BooleanPredicate):
                                 for feat in prot.protein_features:
                                     if feat.feature_type == self._feature_type:
                                         if prot_loc.overlaps_with(feat.info.region):
-                                            return BooleanPredicate.YES
+                                            return GenotypeBooleanPredicate.YES
 
-        return BooleanPredicate.NO
+        return GenotypeBooleanPredicate.NO
         #TODO: Add a logger field, add a branch that handles the state where prot_id is set but prot_loc is not - gives warning
-    
+
     def __str__(self):
         return repr(self)
 
@@ -203,7 +183,7 @@ class ProtFeatureTypePredicate(BooleanPredicate):
         return f'ProtFeatureTypePredicate(tx_id={self._tx_id}, feature_type={self._feature_type})'
 
 
-class ProtFeaturePredicate(BooleanPredicate):
+class ProtFeaturePredicate(GenotypeBooleanPredicate):
     """
     `ProtFeaturePredicate` tests if the `patient` has a variant that overlaps with a protein feature.
 
@@ -222,7 +202,7 @@ class ProtFeaturePredicate(BooleanPredicate):
     def get_question(self) -> str:
         return f'Variant that affects {self._pf_name} feature on protein encoded by transcript {self._tx_id}'
 
-    def test(self, patient: Patient) -> typing.Optional[PatientCategory]:
+    def test(self, patient: Patient) -> typing.Optional[Categorization]:
         self._check_patient(patient)
 
         if len(patient.variants) == 0:
@@ -240,10 +220,9 @@ class ProtFeaturePredicate(BooleanPredicate):
                                 for feat in prot.protein_features:
                                     if feat.info.name == self._pf_name:
                                         if prot_loc.overlaps_with(feat.info.region):
-                                            return BooleanPredicate.YES
+                                            return GenotypeBooleanPredicate.YES
 
-        return BooleanPredicate.NO
-
+        return GenotypeBooleanPredicate.NO
 
     def __str__(self):
         return repr(self)

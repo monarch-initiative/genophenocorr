@@ -3,9 +3,9 @@ import typing
 
 import hpotk
 
-from phenopackets import GenomicInterpretation, Phenopacket, Disease
+from phenopackets import GenomicInterpretation, Phenopacket, Disease as PPDisease
 
-from genophenocorr.model import Patient, SampleLabels, Disease as Dis
+from genophenocorr.model import Patient, SampleLabels, Disease
 from genophenocorr.model import VariantCoordinates, Variant, Genotype, Genotypes
 from genophenocorr.model.genome import GenomeBuild, GenomicRegion, Strand
 from ._api import VariantCoordinateFinder, FunctionalAnnotator
@@ -179,7 +179,7 @@ class PhenopacketPatientCreator(PatientCreator[Phenopacket]):
     
         return Patient(sample_id, phenotypes=phenotypes, variants=variants, diseases=diseases)
 
-    def _add_diseases(self, diseases: typing.Sequence[Disease], notepad: Notepad) -> typing.Sequence[Dis]:
+    def _add_diseases(self, diseases: typing.Sequence[PPDisease], notepad: Notepad) -> typing.Sequence[Disease]:
         """Creates a list of Disease objects from the data in a given Phenopacket
 
         Args:
@@ -195,7 +195,8 @@ class PhenopacketPatientCreator(PatientCreator[Phenopacket]):
             if not dis.HasField("term"):
                 raise ValueError('Could not find term in Disease.')
             term_id = hpotk.TermId.from_curie(dis.term.id)
-            final_diseases.append(Dis(term_id, dis.term.label, not dis.excluded))
+            # Do not include excluded diseases if we decide to assume excluded if not included 
+            final_diseases.append(Disease(term_id, dis.term.label, not dis.excluded))
         return final_diseases
         
 

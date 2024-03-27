@@ -32,8 +32,8 @@ the standard `genophenocorr` installation:
 .. doctest:: input-data
 
   >>> import hpotk
-
-  >>> hpo = hpotk.load_minimal_ontology('http://purl.obolibrary.org/obo/hp.json')
+  >>> store = hpotk.configure_ontology_store()
+  >>> hpo = store.load_minimal_hpo(release='v2024-03-06')
 
 Next, let's get a `CohortCreator` for loading the phenopackets. We use the
 :func:`genophenocorr.preprocessing.configure_caching_cohort_creator` convenience method:
@@ -58,7 +58,7 @@ For the purpose of this example, we will use a folder `simple_cohort` with 5 exa
 .. doctest:: input-data
 
   >>> import os
-  >>> simple_cohort_path = os.path.join(os.getcwd(), 'data', 'simple_cohort')
+  >>> simple_cohort_path = os.path.join('docs', 'data', 'simple_cohort')
 
 We load the phenopackets using `cohort_creator` defined above together with another convenience function
 :class:`genophenocorr.preprocessing.load_phenopacket_folder`:

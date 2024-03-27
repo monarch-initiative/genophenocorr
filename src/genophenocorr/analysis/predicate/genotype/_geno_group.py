@@ -53,7 +53,7 @@ class VariantEffectsPredicate(GroupingPredicate):
 
         if len(patient.variants) == 0:
             return None
-        
+
         results = [False, False]
         for variant in patient.variants:
             for ann in variant.tx_annotations:
@@ -79,7 +79,7 @@ class VariantEffectsPredicate(GroupingPredicate):
 
 class VariantsPredicate(GroupingPredicate):
     """
-    `VariantsPredicate` tests if the `patient` has at least one allele of one of the variants described by 
+    `VariantsPredicate` tests if the `patient` has at least one allele of one of the variants described by
     the `variant_key1` and `variant_key2`.
     **If patient has both variant_keys, it is not included**
 
@@ -103,7 +103,7 @@ class VariantsPredicate(GroupingPredicate):
 
         if len(patient.variants) == 0:
             return None
-        
+
         result = [False, False]
         for variant in patient.variants:
             if variant.variant_coordinates.variant_key == self._variant_key1:
@@ -126,7 +126,7 @@ class VariantsPredicate(GroupingPredicate):
 
 class ExonsPredicate(GroupingPredicate):
     """
-    `ExonsPredicate` tests if the `patient` has a variant that affects one of the 
+    `ExonsPredicate` tests if the `patient` has a variant that affects one of the
     two given *n*-th exons of the transcript of interest.
 
     .. warning::
@@ -188,7 +188,7 @@ class ExonsPredicate(GroupingPredicate):
 
 class ProtFeatureTypesPredicate(GroupingPredicate):
     """
-    `ProtFeatureTypesPredicate` tests if the `patient` has a variant that affects one of the two given 
+    `ProtFeatureTypesPredicate` tests if the `patient` has a variant that affects one of the two given
     :class:`FeatureType`s in the transcript of interest.
 
     :param transcript_id: the accession of the transcript of interest.
@@ -297,7 +297,7 @@ class ProtFeaturesPredicate(GroupingPredicate):
         elif results == [False, True]:
             return GroupingPredicate.SECOND
         else:
-            return None                                  
+            return None
 
     def __str__(self):
         return repr(self)

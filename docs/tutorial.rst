@@ -13,8 +13,9 @@ Set up analysis
 
 .. doctest:: tutorial
 
+  >>> import os
   >>> import hpotk
-  >>> hpo = hpotk.load_minimal_ontology('data/hp.toy.json')
+  >>> hpo = hpotk.load_minimal_ontology(os.path.join('docs', 'data', 'hp.toy.json'))
 
 .. tip::
 
@@ -58,17 +59,19 @@ For instance, we can partition the patients into two groups based on presence/ab
 
 .. doctest:: tutorial
 
+  >>> import pandas as pd
+  >>> pd.set_option('expand_frame_repr', False)
   >>> from genophenocorr.analysis import configure_cohort_analysis
-  >>> from genophenocorr.analysis.predicate import BooleanPredicate  # TODO - explain the predicate or update the API
+  >>> from genophenocorr.analysis.predicate import PatientCategories  # TODO - explain the predicate or update the API
   >>> from genophenocorr.model import VariantEffect
 
   >>> cohort_analysis = configure_cohort_analysis(cohort, hpo)
   >>> missense = cohort_analysis.compare_by_variant_effect(VariantEffect.MISSENSE_VARIANT, tx_id='NM_1234.5')
-  >>> summary_df = missense.summarize(hpo, BooleanPredicate.YES)
-  >>> summary_df.head(1) # doctest: +NORMALIZE_WHITESPACE
-    MISSENSE_VARIANT on NM_1234.5    No             Yes
+  >>> summary_df = missense.summarize(hpo, PatientCategories.YES)
+  >>> summary_df.head(1)  # doctest: +NORMALIZE_WHITESPACE
+    MISSENSE_VARIANT on NM_1234.5    Yes             No
                                     Count   Percent Count Percent   p value Corrected p value
-    Arachnodactyly [HP:0001166]      1/26  3.846154 13/26    50.0  0.000781          0.020299
+    Arachnodactyly [HP:0001166]    13/16     81%  1/10  10%  0.000781          0.020299
 
 ..
 

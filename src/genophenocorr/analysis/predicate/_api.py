@@ -48,7 +48,7 @@ class PatientCategory:
                f"description={self.description})"
 
     def __str__(self) -> str:
-        return self.name
+        return self._name
 
     def __eq__(self, other) -> bool:
         return isinstance(other, PatientCategory) \
@@ -60,10 +60,60 @@ class PatientCategory:
         return hash((self.cat_id, self.name, self.description))
 
 
-class PolyPredicate(metaclass=abc.ABCMeta):
+class PatientCategories(metaclass=abc.ABCMeta):
+    """
+    A static utility class to serve common patient categories.
+    """
+
+    YES = PatientCategory(1, 'Yes', 'The patient belongs to the group.')
+    """
+    Category for a patient who *belongs* to the tested group.
+    """
+
+    NO = PatientCategory(0, 'No', 'The patient does not belong to the group.')
+    """
+    Category for a patient who does *not* belong to the tested group.
+    """
+
+
+class Categorization:
+    """
+    `Categorization` represents one of discrete group a :class:`genophenocorr.model.Patient` can be assigned into.
+    """
+
+    def __init__(
+            self,
+            category: PatientCategory,
+    ):
+        self._category = hpotk.util.validate_instance(category, PatientCategory, 'category')
+
+    @property
+    def category(self) -> PatientCategory:
+        return self._category
+
+    def __eq__(self, other):
+        return isinstance(other, Categorization) and self._category == other._category
+
+    def __hash__(self):
+        return hash((self._category,))
+
+    def __repr__(self):
+        return f'Categorization(category={self._category})'
+
+    def __str__(self):
+        return repr(self)
+
+
+C = typing.TypeVar('C', bound=Categorization)
+"""
+A generic bound for types that extend :class:`Categorization`.
+"""
+
+
+class PolyPredicate(typing.Generic[C], metaclass=abc.ABCMeta):
     """
     `PolyPredicate` bins a :class:`genophenocorr.model.Patient` into one of several discrete groups represented
-    by :class:`PatientCategory`.
+    by :class:`Categorization`.
 
     The groups must be *exclusive* - the patient can be binned into one and only one group,
     and *exhaustive* - the groups must cover all possible scenarios.
@@ -74,13 +124,18 @@ class PolyPredicate(metaclass=abc.ABCMeta):
     Predicate will *not* check if, for instance, the patient variants are compatible with a certain mode of inheritance.
     """
 
-    @staticmethod
     @abc.abstractmethod
-    def get_categories() -> typing.Sequence[PatientCategory]:
+    def get_categorizations(self) -> typing.Sequence[C]:
         """
         Get a sequence of all categories which the `PolyPredicate` can produce.
         """
         pass
+
+    def get_categories(self) -> typing.Sequence[PatientCategory]:
+        """
+        Get a sequence with :class:`PatientCategory` instances that the predicate can produce.
+        """
+        return tuple(c.category for c in self.get_categorizations())
 
     @abc.abstractmethod
     def get_question(self) -> str:
@@ -90,20 +145,19 @@ class PolyPredicate(metaclass=abc.ABCMeta):
         pass
 
     @abc.abstractmethod
-    def test(self, patient: Patient) -> typing.Optional[PatientCategory]:
+    def test(self, patient: Patient) -> typing.Optional[C]:
         """
-        Assign a `patient` into a category.
+        Assign a `patient` into a categorization.
 
         Return `None` if the patient cannot be assigned into any meaningful category.
         """
         pass
 
-    @classmethod
-    def n_categories(cls) -> int:
+    def n_categorizations(self) -> int:
         """
-        Get the number of categories the predicate can produce.
+        Get the number of categorizations the predicate can produce.
         """
-        return len(cls.get_categories())
+        return len(self.get_categorizations())
 
     @staticmethod
     def _check_patient(patient: Patient):
@@ -114,45 +168,45 @@ class PolyPredicate(metaclass=abc.ABCMeta):
             raise ValueError(f"patient must be type Patient but was type {type(patient)}")
 
 
-class BooleanPredicate(PolyPredicate, metaclass=abc.ABCMeta):
+class GenotypePolyPredicate(PolyPredicate[Categorization], metaclass=abc.ABCMeta):
     """
-    `BooleanPredicate` tests if a :class:`genophenocorr.model.Patient` belongs to a group and returns a boolean binning.
+    `GenotypePolyPredicate` constrains `PolyPredicate` to investigate the genotype aspects
+    of patients.
     """
+    pass
 
-    NO = PatientCategory(0, 'No', 'The patient does not belong to the group.')
-    """
-    Category for a patient who does *not* belong to the tested group.
-    """
 
-    YES = PatientCategory(1, 'Yes', 'The patient belongs to the group.')
+class GenotypeBooleanPredicate(GenotypePolyPredicate, metaclass=abc.ABCMeta):
     """
-    Category for a patient who *belongs* to the tested group.
+    `GenotypeBooleanPredicate` tests if a :class:`genophenocorr.model.Patient` belongs to a genotype group
+     and returns a boolean binning.
     """
+    YES = Categorization(PatientCategories.YES)
+    NO = Categorization(PatientCategories.NO)
 
-    @staticmethod
-    def get_categories() -> typing.Sequence[PatientCategory]:
+    def get_categorizations(self) -> typing.Sequence[Categorization]:
         """
         The predicate bins a patient into :class:`BooleanPredicate.NO` or :class:`BooleanPredicate.YES` category.
         """
-        return BooleanPredicate.NO, BooleanPredicate.YES
-    
-class GroupingPredicate(PolyPredicate, metaclass=abc.ABCMeta):
+        return GenotypeBooleanPredicate.YES, GenotypeBooleanPredicate.NO
+
+
+class GroupingPredicate(GenotypePolyPredicate, metaclass=abc.ABCMeta):
     """
     `GroupingPredicate` tests if a :class:`genophenocorr.model.Patient` belongs to one of two groups and returns
     FIRST or SECOND based on which group Patient belongs in.
     """
 
-    FIRST = PatientCategory(0, 'First', 'The patient belongs in the first group.')
+    FIRST = Categorization(PatientCategory(0, 'First', 'The patient belongs in the first group.'))
     """
     Category for a patient who belongs in the first given tested group.
     """
-    SECOND = PatientCategory(1, 'Second', 'The patient belongs in the second group.')
+    SECOND = Categorization(PatientCategory(1, 'Second', 'The patient belongs in the second group.'))
     """
     Category for a patient who belongs to the second given tested group.
     """
-    
-    @staticmethod
-    def get_categories() -> typing.Sequence[PatientCategory]:
+
+    def get_categorizations(self) -> typing.Sequence[Categorization]:
         """
         The predicate bins a patient into :class:`GroupingPredicate.FIRST` or :class:`GroupingPredicate.SECOND` category.
         """

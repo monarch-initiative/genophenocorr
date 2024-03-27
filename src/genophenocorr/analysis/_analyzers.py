@@ -12,7 +12,7 @@ from genophenocorr.model import Cohort, FeatureType, VariantEffect, Patient
 
 from .predicate import PolyPredicate
 from .predicate.genotype import VariantEffectPredicate, VariantPredicate, ExonPredicate, ProtFeatureTypePredicate, ProtFeaturePredicate
-from .predicate.genotype import HOMOZYGOUS, HETEROZYGOUS, NO_VARIANT
+# from .predicate.genotype import HOMOZYGOUS, HETEROZYGOUS, NO_VARIANT
 
 from ._api import CohortAnalysis
 from ._stats import run_recessive_fisher_exact, run_fisher_exact
@@ -181,56 +181,56 @@ class BaseCohortAnalysis(CohortAnalysis):
     def _run_dom_analysis(self, predicate: PolyPredicate, variable1, variable2):
         final_dict = dict()
         all_pvals = []
-        if not self.is_recessive:
-            for hpo in self._testing_hpo_terms:
-                with_hpo_var1_count = len([pat for pat in self._patients_by_hpo.all_with_hpo.get(hpo) if predicate.test(pat, variable1) in (HOMOZYGOUS, HETEROZYGOUS)])
-                not_hpo_var1_count = len([pat for pat in self._patients_by_hpo.all_without_hpo.get(hpo) if predicate.test(pat, variable1) in (HOMOZYGOUS, HETEROZYGOUS)])
-                if variable2 is None:
-                    with_hpo_var2_count = len([pat for pat in self._patients_by_hpo.all_with_hpo.get(hpo) if predicate.test(pat, variable1) == NO_VARIANT])
-                    not_hpo_var2_count = len([pat for pat in self._patients_by_hpo.all_without_hpo.get(hpo) if predicate.test(pat, variable1) == NO_VARIANT])
-                else:
-                    with_hpo_var2_count = len([pat for pat in self._patients_by_hpo.all_with_hpo.get(hpo) if predicate.test(pat, variable2) in (HOMOZYGOUS, HETEROZYGOUS)])
-                    not_hpo_var2_count = len([pat for pat in self._patients_by_hpo.all_without_hpo.get(hpo) if predicate.test(pat, variable2) in (HOMOZYGOUS, HETEROZYGOUS)])
-                if with_hpo_var1_count + not_hpo_var1_count == 0 or with_hpo_var2_count + not_hpo_var2_count == 0:
-                    self._logger.warning(f"Divide by 0 error with HPO {hpo.value}, not included in this analysis.")
-                    continue
-                p_val = run_fisher_exact([[with_hpo_var1_count, not_hpo_var1_count], [with_hpo_var2_count, not_hpo_var2_count]])
-                all_pvals.append(p_val)
-                term_name = self._hpo.get_term(hpo).name
-                final_dict[f"{hpo.value} ({term_name})"] = [with_hpo_var1_count, "{:0.2f}%".format((with_hpo_var1_count/(with_hpo_var1_count + not_hpo_var1_count)) * 100), with_hpo_var2_count, "{:0.2f}%".format((with_hpo_var2_count/(with_hpo_var2_count + not_hpo_var2_count)) * 100), p_val]
-        else:
-            return ValueError(f"Run a recessive analysis")
+        # if not self.is_recessive:
+        #     for hpo in self._testing_hpo_terms:
+        #         with_hpo_var1_count = len([pat for pat in self._patients_by_hpo.all_with_hpo.get(hpo) if predicate.test(pat, variable1) in (HOMOZYGOUS, HETEROZYGOUS)])
+        #         not_hpo_var1_count = len([pat for pat in self._patients_by_hpo.all_without_hpo.get(hpo) if predicate.test(pat, variable1) in (HOMOZYGOUS, HETEROZYGOUS)])
+        #         if variable2 is None:
+        #             with_hpo_var2_count = len([pat for pat in self._patients_by_hpo.all_with_hpo.get(hpo) if predicate.test(pat, variable1) == NO_VARIANT])
+        #             not_hpo_var2_count = len([pat for pat in self._patients_by_hpo.all_without_hpo.get(hpo) if predicate.test(pat, variable1) == NO_VARIANT])
+        #         else:
+        #             with_hpo_var2_count = len([pat for pat in self._patients_by_hpo.all_with_hpo.get(hpo) if predicate.test(pat, variable2) in (HOMOZYGOUS, HETEROZYGOUS)])
+        #             not_hpo_var2_count = len([pat for pat in self._patients_by_hpo.all_without_hpo.get(hpo) if predicate.test(pat, variable2) in (HOMOZYGOUS, HETEROZYGOUS)])
+        #         if with_hpo_var1_count + not_hpo_var1_count == 0 or with_hpo_var2_count + not_hpo_var2_count == 0:
+        #             self._logger.warning(f"Divide by 0 error with HPO {hpo.value}, not included in this analysis.")
+        #             continue
+        #         p_val = run_fisher_exact([[with_hpo_var1_count, not_hpo_var1_count], [with_hpo_var2_count, not_hpo_var2_count]])
+        #         all_pvals.append(p_val)
+        #         term_name = self._hpo.get_term(hpo).name
+        #         final_dict[f"{hpo.value} ({term_name})"] = [with_hpo_var1_count, "{:0.2f}%".format((with_hpo_var1_count/(with_hpo_var1_count + not_hpo_var1_count)) * 100), with_hpo_var2_count, "{:0.2f}%".format((with_hpo_var2_count/(with_hpo_var2_count + not_hpo_var2_count)) * 100), p_val]
+        # else:
+        #     return ValueError(f"Run a recessive analysis")
         corrected_pvals = multitest.multipletests(all_pvals, method = self._correction)[1]
         return final_dict, corrected_pvals
 
     def _run_rec_analysis(self, predicate, variable1, variable2):
         final_dict = dict()
         all_pvals = []
-        if self.is_recessive:
-            for hpo in self._testing_hpo_terms:
-                if variable2 is None:
-                    with_hpo_var1_var1 = len([pat for pat in self._patients_by_hpo.all_with_hpo.get(hpo) if predicate.test(pat, variable1) == HOMOZYGOUS])
-                    no_hpo_var1_var1 = len([pat for pat in self._patients_by_hpo.all_without_hpo.get(hpo) if predicate.test(pat, variable1) == HOMOZYGOUS])
-                    with_hpo_var1_var2 = len([pat for pat in self._patients_by_hpo.all_with_hpo.get(hpo) if predicate.test(pat, variable1) == HETEROZYGOUS])
-                    no_hpo_var1_var2 = len([pat for pat in self._patients_by_hpo.all_without_hpo.get(hpo) if predicate.test(pat, variable1) == HETEROZYGOUS])
-                    with_hpo_var2_var2 = len([pat for pat in self._patients_by_hpo.all_with_hpo.get(hpo) if predicate.test(pat, variable1) == NO_VARIANT])
-                    no_hpo_var2_var2 = len([pat for pat in self._patients_by_hpo.all_without_hpo.get(hpo) if predicate.test(pat, variable1) == NO_VARIANT])
-                else:
-                    with_hpo_var1_var1 = len([pat for pat in self._patients_by_hpo.all_with_hpo.get(hpo) if predicate.test(pat, variable1) == HOMOZYGOUS])
-                    no_hpo_var1_var1 = len([pat for pat in self._patients_by_hpo.all_without_hpo.get(hpo) if predicate.test(pat, variable1) == HOMOZYGOUS])
-                    with_hpo_var1_var2 = len([pat for pat in self._patients_by_hpo.all_with_hpo.get(hpo) if predicate.test(pat, variable1) == HETEROZYGOUS and predicate.test(pat, variable2) == HETEROZYGOUS])
-                    no_hpo_var1_var2 = len([pat for pat in self._patients_by_hpo.all_without_hpo.get(hpo) if predicate.test(pat, variable1) == HETEROZYGOUS and predicate.test(pat, variable2) == HETEROZYGOUS])
-                    with_hpo_var2_var2 = len([pat for pat in self._patients_by_hpo.all_with_hpo.get(hpo) if predicate.test(pat, variable2) == HOMOZYGOUS])
-                    no_hpo_var2_var2 = len([pat for pat in self._patients_by_hpo.all_without_hpo.get(hpo) if predicate.test(pat, variable2) == HOMOZYGOUS])
-                if with_hpo_var1_var1 + no_hpo_var1_var1 == 0 or with_hpo_var1_var2 + no_hpo_var1_var2 == 0 or with_hpo_var2_var2 + no_hpo_var2_var2 == 0:
-                    self._logger.warning(f"Divide by 0 error with HPO {hpo.value}, not included in this analysis.")
-                    continue
-                p_val = run_recessive_fisher_exact([[with_hpo_var1_var1, no_hpo_var1_var1], [with_hpo_var1_var2, no_hpo_var1_var2], [with_hpo_var2_var2, no_hpo_var2_var2]] )
-                all_pvals.append(p_val)
-                term_name = self._hpo.get_term(hpo).name
-                final_dict[f"{hpo.value} ({term_name})"] = [with_hpo_var1_var1, "{:0.2f}%".format((with_hpo_var1_var1/(with_hpo_var1_var1 + no_hpo_var1_var1)) * 100), with_hpo_var1_var2, "{:0.2f}%".format((with_hpo_var1_var2/(no_hpo_var1_var2 + with_hpo_var1_var2)) * 100), with_hpo_var2_var2, "{:0.2f}%".format((with_hpo_var2_var2/(with_hpo_var2_var2 + no_hpo_var2_var2)) * 100), p_val]
-        else:
-            return ValueError("Run a dominant analysis")
+        # if self.is_recessive:
+            # for hpo in self._testing_hpo_terms:
+                # if variable2 is None:
+                #     with_hpo_var1_var1 = len([pat for pat in self._patients_by_hpo.all_with_hpo.get(hpo) if predicate.test(pat, variable1) == HOMOZYGOUS])
+                #     no_hpo_var1_var1 = len([pat for pat in self._patients_by_hpo.all_without_hpo.get(hpo) if predicate.test(pat, variable1) == HOMOZYGOUS])
+                #     with_hpo_var1_var2 = len([pat for pat in self._patients_by_hpo.all_with_hpo.get(hpo) if predicate.test(pat, variable1) == HETEROZYGOUS])
+                #     no_hpo_var1_var2 = len([pat for pat in self._patients_by_hpo.all_without_hpo.get(hpo) if predicate.test(pat, variable1) == HETEROZYGOUS])
+                #     with_hpo_var2_var2 = len([pat for pat in self._patients_by_hpo.all_with_hpo.get(hpo) if predicate.test(pat, variable1) == NO_VARIANT])
+                #     no_hpo_var2_var2 = len([pat for pat in self._patients_by_hpo.all_without_hpo.get(hpo) if predicate.test(pat, variable1) == NO_VARIANT])
+                # else:
+                #     with_hpo_var1_var1 = len([pat for pat in self._patients_by_hpo.all_with_hpo.get(hpo) if predicate.test(pat, variable1) == HOMOZYGOUS])
+                #     no_hpo_var1_var1 = len([pat for pat in self._patients_by_hpo.all_without_hpo.get(hpo) if predicate.test(pat, variable1) == HOMOZYGOUS])
+                #     with_hpo_var1_var2 = len([pat for pat in self._patients_by_hpo.all_with_hpo.get(hpo) if predicate.test(pat, variable1) == HETEROZYGOUS and predicate.test(pat, variable2) == HETEROZYGOUS])
+                #     no_hpo_var1_var2 = len([pat for pat in self._patients_by_hpo.all_without_hpo.get(hpo) if predicate.test(pat, variable1) == HETEROZYGOUS and predicate.test(pat, variable2) == HETEROZYGOUS])
+                #     with_hpo_var2_var2 = len([pat for pat in self._patients_by_hpo.all_with_hpo.get(hpo) if predicate.test(pat, variable2) == HOMOZYGOUS])
+                #     no_hpo_var2_var2 = len([pat for pat in self._patients_by_hpo.all_without_hpo.get(hpo) if predicate.test(pat, variable2) == HOMOZYGOUS])
+                # if with_hpo_var1_var1 + no_hpo_var1_var1 == 0 or with_hpo_var1_var2 + no_hpo_var1_var2 == 0 or with_hpo_var2_var2 + no_hpo_var2_var2 == 0:
+                #     self._logger.warning(f"Divide by 0 error with HPO {hpo.value}, not included in this analysis.")
+                #     continue
+                # p_val = run_recessive_fisher_exact([[with_hpo_var1_var1, no_hpo_var1_var1], [with_hpo_var1_var2, no_hpo_var1_var2], [with_hpo_var2_var2, no_hpo_var2_var2]] )
+                # all_pvals.append(p_val)
+                # term_name = self._hpo.get_term(hpo).name
+                # final_dict[f"{hpo.value} ({term_name})"] = [with_hpo_var1_var1, "{:0.2f}%".format((with_hpo_var1_var1/(with_hpo_var1_var1 + no_hpo_var1_var1)) * 100), with_hpo_var1_var2, "{:0.2f}%".format((with_hpo_var1_var2/(no_hpo_var1_var2 + with_hpo_var1_var2)) * 100), with_hpo_var2_var2, "{:0.2f}%".format((with_hpo_var2_var2/(with_hpo_var2_var2 + no_hpo_var2_var2)) * 100), p_val]
+        # else:
+        #     return ValueError("Run a dominant analysis")
         corrected_pvals = multitest.multipletests(all_pvals, method = self._correction)[1]
         return final_dict, corrected_pvals
 
